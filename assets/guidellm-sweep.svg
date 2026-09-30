@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 430" role="img" aria-labelledby="title description">
+  <title id="title">A GuideLLM sweep</title>
+  <desc id="description">A sweep runs one synchronous benchmark, one throughput benchmark, and eight constant-rate benchmarks at rates between the two.</desc>
+
+  <rect x="1" y="1" width="1198" height="428" rx="24" fill="#ffffff" stroke="#d0d7de" stroke-width="2"/>
+
+  <text x="56" y="60" fill="#ee0000" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" letter-spacing="1">GUIDELLM SWEEP</text>
+  <text x="56" y="100" fill="#24292f" font-family="Arial, Helvetica, sans-serif" font-size="30" font-weight="700">Ten benchmarks, one command</text>
+  <line x1="56" y1="124" x2="1144" y2="124" stroke="#ee0000" stroke-width="3"/>
+  <line x1="80" y1="330" x2="1144" y2="330" stroke="#d0d7de" stroke-width="2"/>
+  <text x="70" y="235" fill="#6e7781" font-family="Arial, Helvetica, sans-serif" font-size="13" text-anchor="middle" transform="rotate(-90 70 235)">Requests per second</text>
+  <rect x="116" y="313" width="74" height="17" rx="6" fill="#57606a"/>
+  <text x="153.0" y="354" fill="#24292f" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="700">1</text>
+  <rect x="214" y="166.8" width="74" height="163.2" rx="6" fill="#ffffff" stroke="#ee0000" stroke-width="3" stroke-dasharray="7 5"/>
+  <text x="251.0" y="354" fill="#24292f" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="700">2</text>
+  <rect x="312" y="297.8888888888889" width="74" height="32.11111111111111" rx="6" fill="#f6a5a5"/>
+  <text x="349.0" y="354" fill="#24292f" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="700">3</text>
+  <rect x="410" y="282.77777777777777" width="74" height="47.22222222222222" rx="6" fill="#f6a5a5"/>
+  <text x="447.0" y="354" fill="#24292f" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="700">4</text>
+  <rect x="508" y="267.6666666666667" width="74" height="62.33333333333333" rx="6" fill="#f6a5a5"/>
+  <text x="545.0" y="354" fill="#24292f" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="700">5</text>
+  <rect x="606" y="252.55555555555554" width="74" height="77.44444444444444" rx="6" fill="#f6a5a5"/>
+  <text x="643.0" y="354" fill="#24292f" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="700">6</text>
+  <rect x="704" y="237.44444444444446" width="74" height="92.55555555555556" rx="6" fill="#f6a5a5"/>
+  <text x="741.0" y="354" fill="#24292f" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="700">7</text>
+  <rect x="802" y="222.33333333333334" width="74" height="107.66666666666666" rx="6" fill="#f6a5a5"/>
+  <text x="839.0" y="354" fill="#24292f" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="700">8</text>
+  <rect x="900" y="207.22222222222223" width="74" height="122.77777777777779" rx="6" fill="#f6a5a5"/>
+  <text x="937.0" y="354" fill="#24292f" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="700">9</text>
+  <rect x="998" y="192.11111111111111" width="74" height="137.88888888888889" rx="6" fill="#f6a5a5"/>
+  <text x="1035.0" y="354" fill="#24292f" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="700">10</text>
+  <text x="153.0" y="378" fill="#57606a" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="14">synchronous</text>
+  <text x="251.0" y="378" fill="#57606a" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="14">throughput</text>
+  <text x="692.0" y="378" fill="#57606a" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="14">constant: eight rates spaced between the synchronous and throughput rates</text>
+  <text x="153.0" y="402" fill="#6e7781" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="12">one at a time</text>
+  <text x="251.0" y="402" fill="#6e7781" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="12">all at once</text>
+</svg>

@@ -1,0 +1,2 @@
+guidellm[recommended]==0.7.4
+lm-eval[api]==0.4.13
