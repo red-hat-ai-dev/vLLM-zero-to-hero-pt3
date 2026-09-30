@@ -276,10 +276,6 @@ The script accepts these settings as environment variables:
 | `NUM_CONCURRENT` | `8` | How many requests lm-eval sends at the same time |
 | `PORT` | `8000` | The port of the vLLM server |
 
-### Running lm-eval directly (Optional)
-
-lm-eval is installed in `.venv/bin/lm_eval`, so you can also run it directly. The main options are:
-
 | Option | What it does |
 | --- | --- |
 | `--model` | How lm-eval reaches the model. `local-completions` and `local-chat-completions` send requests to a running server. `vllm` loads its own vLLM engine inside the lm-eval process. |
@@ -289,19 +285,6 @@ lm-eval is installed in `.venv/bin/lm_eval`, so you can also run it directly. Th
 | `--limit` | Evaluate only the first N examples of each task |
 | `--apply_chat_template` | Wrap each prompt in the model's chat template |
 | `--log_samples` | Save every prompt and response next to the scores |
-
-This part uses `local-completions` so lm-eval tests the exact server that GuideLLM benchmarked. The `vllm` model type is useful on a Linux GPU machine without a running server. It needs the GPU to itself, so stop the server first:
-
-```bash
-./stop.sh
-lm_eval \
-  --model vllm \
-  --model_args pretrained=Qwen/Qwen3-4B,dtype=auto \
-  --tasks gsm8k \
-  --output_path results/eval-baseline-inprocess
-```
-
-This requires vLLM installed in the same Python environment as lm-eval.
 
 ## 5. Serve, benchmark, and evaluate the optimized model
 
