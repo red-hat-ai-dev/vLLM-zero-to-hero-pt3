@@ -276,6 +276,8 @@ The script accepts these settings as environment variables:
 | `NUM_CONCURRENT` | `8` | How many requests lm-eval sends at the same time |
 | `PORT` | `8000` | The port of the vLLM server |
 
+### Running lm-eval directly (Optional)
+
 lm-eval is installed in `.venv/bin/lm_eval`, so you can also run it directly. The main options are:
 
 | Option | What it does |
