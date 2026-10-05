@@ -1,6 +1,6 @@
 # vLLM Zero to Hero: Benchmark
 
-### *This is part three in a four part series. Follow the vLLM-zero-to-hero [campaign path](https://github.com/red-hat-ai-dev/vLLM-zero-to-hero-overview) to learn more!*
+### *This is part three in a three-part series with optional extra-credit lessons. Follow the vLLM-zero-to-hero [campaign path](https://github.com/red-hat-ai-dev/vLLM-zero-to-hero-overview) to learn more!*
 
 Okay, so you've made your model smaller and faster. But how much faster is it, really? And did it get any worse at its job?
 
