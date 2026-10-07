@@ -49,12 +49,11 @@ in Part 2 is benchmarked.
 
 ### Linux containers
 
-The Linux path uses the same `cuda`, `rocm`, and `xpu` images as Part 1:
+The Linux path uses the same `cuda` and `rocm` images as Part 1:
 
 ```text
 ghcr.io/red-hat-ai-dev/vllm-zero-to-hero:cuda
 ghcr.io/red-hat-ai-dev/vllm-zero-to-hero:rocm
-ghcr.io/red-hat-ai-dev/vllm-zero-to-hero:xpu
 ```
 
 The images do not contain model weights. The launcher passes the model and its
