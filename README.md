@@ -15,8 +15,6 @@ This is how the pipeline is going to look: you serve a model with vLLM, benchmar
 Want to know what the scripts are doing? Read
 [Behind the scenes](BEHIND_THE_SCENES.md).
 
-See [tested support and validation](SUPPORT.md) for the exact platforms, versions, and remaining checks.
-
 ## What you will learn
 
 - How to run a GuideLLM sweep against a live vLLM endpoint
@@ -118,7 +116,7 @@ Both models are served under the same name, `qwen3-4b`, so every command in this
 
 Keep vLLM running and use another terminal.
 
-On Apple Silicon, set the tested concurrency cap in that terminal and keep it
+On Apple Silicon, limit concurrent requests in that terminal and keep this setting
 for both the baseline and optimized benchmarks:
 
 ```bash
@@ -146,7 +144,7 @@ guidellm run \
   --output kind=html,path=results/benchmark-baseline.html
 ```
 
-The adaptive sweep targets up to 10 benchmarks at 30 seconds each, plus setup, warmup, and shutdown time. It may stop earlier when a measured rate is invalid or a stopping constraint is reached. When it finishes, the results are saved in the `results/` folder:
+The sweep runs up to 10 benchmarks at 30 seconds each, plus setup and shutdown time. When it finishes, the results are saved in the `results/` folder:
 
 - `benchmark-baseline.latest/benchmark.json`: every statistic, for reloading and comparing
 - `benchmark-baseline.latest/benchmark.html`: a self-contained report with charts. Open it in a browser.
@@ -202,22 +200,6 @@ For example, to simulate a workload with long documents and short answers:
 PROMPT_TOKENS=2048 OUTPUT_TOKENS=64 ./benchmark.sh baseline
 ```
 
-On a local machine, start with a bounded load and use the same settings for both
-models. For example, to cap the sweep at eight concurrent requests:
-
-```bash
-MAX_CONCURRENCY=8 ./benchmark.sh baseline
-MAX_CONCURRENCY=8 ./benchmark.sh optimized
-```
-
-Run each command while its corresponding model is serving. The concurrency cap
-is saved in `run.json`; comparison rejects different caps or missing provenance
-on one side. Both models need new runs when changing the cap. A zero-completion
-strategy is still rejected. On the tested M4 Pro, the default 512-concurrency
-BF16 throughput strategy completed no requests in either 10 or 30 seconds;
-both models completed all ten strategies with the eight-request cap at 30
-seconds per strategy. See [the support record](SUPPORT.md) for the tested scope.
-
 GuideLLM itself is installed in `.venv/bin/guidellm`, so you can also run it directly. Every option uses the form `--<option> kind=<type>,key=value`. The main options are:
 
 | Option | Choices |
@@ -244,10 +226,8 @@ For example, to measure the experience of 1, 4, 16, and 64 simultaneous users:
 Run `.venv/bin/guidellm run --help` for every option, or read the
 [GuideLLM documentation](https://github.com/vllm-project/guidellm/tree/main/docs).
 
-Each wrapper saves a separate run under `results/runs/`. The `.latest` link
-changes only after the tool succeeds and its JSON is readable. Failed runs keep
-their logs and earlier successful runs remain available. Direct tool commands
-above write their own paths and do not use this protection.
+The lesson scripts keep previous results under `results/runs/`. The `.latest`
+paths point to the most recent successful run, so a failed rerun won't replace it.
 
 ## 4. Evaluate the baseline model
 
@@ -354,6 +334,10 @@ If you used `LIMIT` or changed any benchmark setting for the baseline, use the s
 ./compare.sh
 ```
 
+If the script reports mismatched settings, rerun both models with the same
+benchmark settings and evaluation sample limit. Results from an older version
+of these scripts may also need a rerun.
+
 The script reads both sets of results and prints them side by side with the change between them:
 
 | Row | What it tells you |
@@ -400,10 +384,3 @@ with your platform, the command you tried, and the error message.
 ---
 
 [Back to the vLLM Zero to Hero overview](https://github.com/red-hat-ai-dev/vLLM-zero-to-hero-overview)
-
-Comparison requires matching workload settings and tool versions for benchmark
-runs. Evaluations must have matching task definitions, versions, few-shot
-settings, effective sample counts, and random seeds. A 20-example smoke test
-cannot be compared to a full GSM8K run. Old benchmark files without provenance
-must be rerun; they remain on disk. Only accuracy metrics are displayed as
-percent correct, and missing latency statistics are shown as `--`.
