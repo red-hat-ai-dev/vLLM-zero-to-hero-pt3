@@ -1,6 +1,11 @@
 #!/bin/sh
 set -eu
 
+script_dir="$(CDPATH='' cd "$(dirname "$0")" && pwd)"
+# shellcheck source=scripts/engine.sh
+. "$script_dir/scripts/engine.sh"
+managed_label="io.github.red-hat-ai-dev.vllm-zero-to-hero.managed"
+
 name="vllm-zero-to-hero"
 volume="vllm-models"
 script_dir="$(CDPATH='' cd "$(dirname "$0")" && pwd)"
@@ -83,17 +88,7 @@ confirm_cleanup() {
 }
 
 select_engine() {
-  if [ -n "${ENGINE:-}" ]; then
-    engine="$ENGINE"
-  elif command -v podman >/dev/null 2>&1 && podman info >/dev/null 2>&1; then
-    engine="podman"
-  elif command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
-    engine="docker"
-  elif command -v podman >/dev/null 2>&1 || command -v docker >/dev/null 2>&1; then
-    error "A container engine is installed but is not running."
-    echo "Start Docker or Podman, then run ./cleanup.sh again." >&2
-    exit 1
-  fi
+  resolve_managed_engine "$name" "$managed_label" "${volume:-}"
 }
 
 case "${1:-}" in
@@ -134,6 +129,7 @@ describe_path "temporary logs and state" "$state_dir"
 echo
 echo "Your results/ folder, the vLLM Metal environment, and container images will not be removed."
 echo
+echo "The shared vLLM Metal environment is kept."
 confirm_cleanup
 
 if [ -n "$engine" ]; then

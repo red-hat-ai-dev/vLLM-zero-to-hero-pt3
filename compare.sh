@@ -1,6 +1,7 @@
 #!/bin/sh
 set -eu
 
+# shellcheck source=scripts/tools.sh
 . "$(CDPATH='' cd "$(dirname "$0")" && pwd)/scripts/tools.sh"
 
 if [ "$#" -ne 0 ] && [ "$#" -ne 2 ]; then
