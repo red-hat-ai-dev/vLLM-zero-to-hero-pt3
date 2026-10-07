@@ -22,7 +22,7 @@ backend=""
 metal_pid=""
 
 usage() {
-  echo "Usage: ./run.sh baseline|optimized [nvidia|amd|intel|metal]" >&2
+  echo "Usage: ./run.sh baseline|optimized [nvidia|amd|metal]" >&2
 }
 
 error() {
@@ -222,18 +222,11 @@ detect_accelerator() {
     accelerator="amd"
   else
     accelerator=""
-    for vendor_file in /sys/class/drm/card*/device/vendor; do
-      [ -r "$vendor_file" ] || continue
-      if [ "$(cat "$vendor_file")" = "0x8086" ]; then
-        accelerator="intel"
-        break
-      fi
-    done
   fi
 
   if [ -z "$accelerator" ]; then
-    error "No supported NVIDIA, AMD, or Intel accelerator was detected."
-    echo "You can override detection with ./run.sh $mode nvidia, amd, or intel." >&2
+    error "No supported NVIDIA or AMD accelerator was detected."
+    echo "You can override detection with ./run.sh $mode nvidia or amd." >&2
     exit 1
   fi
 }
@@ -248,7 +241,7 @@ check_port_free() {
 
 run_linux() {
   case "$requested" in
-    auto|nvidia|amd|intel) ;;
+    auto|nvidia|amd) ;;
     metal)
       error "vLLM Metal is available only on an Apple Silicon Mac."
       exit 1
@@ -292,11 +285,6 @@ run_linux() {
       image="$image_repo:rocm"
       set -- --device /dev/kfd --device /dev/dri --group-add video \
         --cap-add SYS_PTRACE --security-opt seccomp=unconfined
-      ;;
-    intel)
-      image="$image_repo:xpu"
-      set -- --device /dev/dri:/dev/dri \
-        -v /dev/dri/by-path:/dev/dri/by-path --privileged
       ;;
     *)
       error "Unknown accelerator: $accelerator"
@@ -382,7 +370,7 @@ install_metal() {
 run_macos() {
   case "$requested" in
     auto|metal) ;;
-    nvidia|amd|intel)
+    nvidia|amd)
       error "$requested acceleration through this launcher requires Linux."
       echo "On Apple Silicon, run ./run.sh $mode without an override to use Metal." >&2
       exit 1

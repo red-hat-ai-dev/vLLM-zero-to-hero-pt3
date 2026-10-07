@@ -81,7 +81,6 @@ The platform paths are:
 | Apple Silicon Mac | Native vLLM Metal with `mlx-community/Qwen3-4B-bf16` | Native vLLM Metal with `mlx-community/Qwen3-4B-4bit` | Local Python environment |
 | Linux with NVIDIA | CUDA container | CUDA container; primary path for this part | Local Python environment |
 | Linux with AMD | ROCm container | Try with the current vLLM ROCm support and verify locally | Local Python environment |
-| Linux with Intel | XPU container | Try with the current vLLM XPU support and verify locally | Local Python environment |
 
 The FP8 checkpoint from Part 2 does not run on vLLM Metal, so the Mac path compares the full-precision MLX model with a four-bit MLX model instead. On NVIDIA, FP8 runs at full speed on GPUs with compute capability 8.9 or newer, such as the L4, L40S, and H100. Ampere GPUs such as the A100 run it as weight-only FP8, so the speedup is smaller.
 
