@@ -75,14 +75,13 @@ backend_is_running() {
 }
 
 port_is_serving() {
-  curl --fail --silent "http://127.0.0.1:$port/v1/models" >/dev/null 2>&1
+  curl --connect-timeout 2 --max-time 5 --fail --silent "http://127.0.0.1:$port/v1/models" >/dev/null 2>&1
 }
 
 wait_until_ready() {
-  attempt=0
+  deadline=$(( $(date +%s) + 1800 ))
   printf "Waiting for vLLM"
   until port_is_serving; do
-    attempt=$((attempt + 1))
 
     if ! backend_is_running; then
       echo
@@ -92,7 +91,7 @@ wait_until_ready() {
       return 1
     fi
 
-    if [ "$attempt" -ge 360 ]; then
+    if [ "$(date +%s)" -ge "$deadline" ]; then
       echo
       error "vLLM did not become ready within 30 minutes."
       echo "Check your internet connection and available memory, then try again." >&2
@@ -105,6 +104,12 @@ wait_until_ready() {
     sleep 5
   done
 
+  if ! backend_is_running; then
+    error "vLLM stopped before it became ready."
+    show_recent_logs
+    cleanup_started_backend
+    return 1
+  fi
   echo
   trap - INT TERM HUP
   echo "vLLM is serving the $mode model ($model) as $served_model."
@@ -277,7 +282,7 @@ run_linux() {
   case "$accelerator" in
     nvidia)
       image="$image_repo:cuda"
-      if [ "$engine" = "podman" ]; then
+      if [ "${engine##*/}" = "podman" ]; then
         set -- --device nvidia.com/gpu=all --security-opt=label=disable
       else
         set -- --gpus all

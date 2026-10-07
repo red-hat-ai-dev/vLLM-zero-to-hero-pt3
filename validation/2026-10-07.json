@@ -1,0 +1,307 @@
+{
+  "date": "2026-10-07",
+  "base_commit": "a1e78505be5c3703fffde435feccb6c4c740697f",
+  "tested_source": "This local change set on top of base_commit; no branch was published.",
+  "os": "Linux-6.12.95+deb13-amd64-x86_64-with-glibc2.41",
+  "gpu": "NVIDIA GeForce RTX 3090, 610.43.02, 24576 MiB",
+  "podman": "podman version 5.4.2",
+  "vllm": "0.28.0",
+  "image": {
+    "id": "af125961b9c8224dd758ac32a9658a5863f02f7dfed3ccc9176b7ed6d60012bb",
+    "digest": "sha256:2ab233875b00171aa9a3a31e970c3eb473a7950d7feda1e8c8e12698da8a0826",
+    "repo_digests": [
+      "ghcr.io/red-hat-ai-dev/vllm-zero-to-hero@sha256:2ab233875b00171aa9a3a31e970c3eb473a7950d7feda1e8c8e12698da8a0826",
+      "ghcr.io/red-hat-ai-dev/vllm-zero-to-hero@sha256:48c2bdb297dc05e398d9f4ca550d0bbbdc06b1ec5dbb09f4dd3455660491dc9a"
+    ],
+    "command": [
+      "Qwen/Qwen3.5-2B",
+      "--host",
+      "0.0.0.0",
+      "--port",
+      "8000",
+      "--served-model-name",
+      "qwen3.5-2b",
+      "--max-model-len",
+      "8192"
+    ]
+  },
+  "baseline_model": "Qwen/Qwen3-4B",
+  "model_revision": "1cfa9a7208912126459214e8b04321603b3df60c",
+  "optimized_model": "Local Part 2 FP8 checkpoint, converted on the CPU with LLM Compressor 0.13.0",
+  "fp8_shards": {
+    "model-00001-of-00003.safetensors": {
+      "bytes": 2368988544,
+      "sha256": "5d2b8d9725b309d784c1957d3eac7d52e45ab23b10ef20ff8d6144bdc5a79160"
+    },
+    "model-00002-of-00003.safetensors": {
+      "bytes": 1995070072,
+      "sha256": "def97afe67adced8626d761d90591a3289232379d00335f3b54aeb960784a321"
+    },
+    "model-00003-of-00003.safetensors": {
+      "bytes": 49848032,
+      "sha256": "9f84c34ca09cc552ad68e317282b2e932531177a5bf391a729e0fc4dd6614c51"
+    }
+  },
+  "commands": [
+    "ENGINE=podman PORT=8017 ./run.sh baseline nvidia",
+    "PORT=8017 RESULTS_DIR=<evidence>/pt3-full-results ./benchmark.sh baseline",
+    "PORT=8017 RESULTS_DIR=<evidence>/pt3-full-results ./evaluate.sh baseline",
+    "./stop.sh",
+    "ENGINE=podman PORT=8017 OPTIMIZED_MODEL=<part2>/artifacts/Qwen3-4B-FP8-Dynamic ./run.sh optimized nvidia",
+    "PORT=8017 RESULTS_DIR=<evidence>/pt3-full-results ./benchmark.sh optimized",
+    "PORT=8017 RESULTS_DIR=<evidence>/pt3-full-results ./evaluate.sh optimized",
+    "./stop.sh",
+    "RESULTS_DIR=<evidence>/pt3-full-results ./compare.sh",
+    "<part3>/cleanup.sh --yes (from outside the repository, ENGINE unset)"
+  ],
+  "runs": {
+    "pt3-results": {
+      "baseline": {
+        "benchmark_strategies": 9,
+        "benchmark_request_counts": {
+          "successful": 33,
+          "errored": 0,
+          "incomplete": 588
+        },
+        "benchmark_workload": {
+          "kind": "benchmark",
+          "label": "baseline",
+          "platform": "Linux-6.12.95+deb13-amd64-x86_64-with-glibc2.41",
+          "tools": {
+            "guidellm": "0.7.4",
+            "lm-eval": "0.4.13"
+          },
+          "workload": {
+            "TOKENIZER": "Qwen/Qwen3-4B",
+            "PROMPT_TOKENS": "256",
+            "OUTPUT_TOKENS": "128",
+            "MAX_SECONDS": "10"
+          }
+        },
+        "evaluation_samples": {
+          "gsm8k": {
+            "original": 1319,
+            "effective": 20
+          }
+        },
+        "evaluation_scores": {
+          "gsm8k": {
+            "name": "gsm8k",
+            "alias": "gsm8k",
+            "sample_len": 20,
+            "exact_match,strict-match": 0.8,
+            "exact_match_stderr,strict-match": 0.0917662935482247,
+            "exact_match,flexible-extract": 0.8,
+            "exact_match_stderr,flexible-extract": 0.0917662935482247
+          }
+        },
+        "evaluation_workload": {
+          "kind": "eval",
+          "label": "baseline",
+          "platform": "Linux-6.12.95+deb13-amd64-x86_64-with-glibc2.41",
+          "tools": {
+            "guidellm": "0.7.4",
+            "lm-eval": "0.4.13"
+          },
+          "workload": {
+            "TOKENIZER": "Qwen/Qwen3-4B",
+            "TASKS": "gsm8k",
+            "LIMIT": "20",
+            "NUM_CONCURRENT": "2"
+          }
+        },
+        "evaluation_seconds": "28.20307905320078"
+      },
+      "optimized": {
+        "benchmark_strategies": 9,
+        "benchmark_request_counts": {
+          "successful": 52,
+          "errored": 0,
+          "incomplete": 777
+        },
+        "benchmark_workload": {
+          "kind": "benchmark",
+          "label": "optimized",
+          "platform": "Linux-6.12.95+deb13-amd64-x86_64-with-glibc2.41",
+          "tools": {
+            "guidellm": "0.7.4",
+            "lm-eval": "0.4.13"
+          },
+          "workload": {
+            "TOKENIZER": "Qwen/Qwen3-4B",
+            "PROMPT_TOKENS": "256",
+            "OUTPUT_TOKENS": "128",
+            "MAX_SECONDS": "10"
+          }
+        },
+        "evaluation_samples": {
+          "gsm8k": {
+            "original": 1319,
+            "effective": 20
+          }
+        },
+        "evaluation_scores": {
+          "gsm8k": {
+            "name": "gsm8k",
+            "alias": "gsm8k",
+            "sample_len": 20,
+            "exact_match,strict-match": 0.75,
+            "exact_match_stderr,strict-match": 0.09933992677987828,
+            "exact_match,flexible-extract": 0.75,
+            "exact_match_stderr,flexible-extract": 0.09933992677987828
+          }
+        },
+        "evaluation_workload": {
+          "kind": "eval",
+          "label": "optimized",
+          "platform": "Linux-6.12.95+deb13-amd64-x86_64-with-glibc2.41",
+          "tools": {
+            "guidellm": "0.7.4",
+            "lm-eval": "0.4.13"
+          },
+          "workload": {
+            "TOKENIZER": "Qwen/Qwen3-4B",
+            "TASKS": "gsm8k",
+            "LIMIT": "20",
+            "NUM_CONCURRENT": "2"
+          }
+        },
+        "evaluation_seconds": "18.877580925822258"
+      }
+    },
+    "pt3-full-results": {
+      "baseline": {
+        "benchmark_strategies": 10,
+        "benchmark_request_counts": {
+          "successful": 1410,
+          "errored": 0,
+          "incomplete": 721
+        },
+        "benchmark_workload": {
+          "kind": "benchmark",
+          "label": "baseline",
+          "platform": "Linux-6.12.95+deb13-amd64-x86_64-with-glibc2.41",
+          "tools": {
+            "guidellm": "0.7.4",
+            "lm-eval": "0.4.13"
+          },
+          "workload": {
+            "TOKENIZER": "Qwen/Qwen3-4B",
+            "PROMPT_TOKENS": "256",
+            "OUTPUT_TOKENS": "128",
+            "MAX_SECONDS": "30"
+          }
+        },
+        "evaluation_samples": {
+          "gsm8k": {
+            "original": 1319,
+            "effective": 1319
+          }
+        },
+        "evaluation_scores": {
+          "gsm8k": {
+            "name": "gsm8k",
+            "alias": "gsm8k",
+            "sample_len": 1319,
+            "exact_match,strict-match": 0.8506444275966641,
+            "exact_match_stderr,strict-match": 0.009818090723727286,
+            "exact_match,flexible-extract": 0.844579226686884,
+            "exact_match_stderr,flexible-extract": 0.009979689409499148
+          }
+        },
+        "evaluation_workload": {
+          "created_at_utc": "2026-10-07T20:50:25.139574+00:00",
+          "kind": "eval",
+          "label": "baseline",
+          "platform": "Linux-6.12.95+deb13-amd64-x86_64-with-glibc2.41",
+          "tools": {
+            "guidellm": "0.7.4",
+            "lm-eval": "0.4.13"
+          },
+          "workload": {
+            "TOKENIZER": "Qwen/Qwen3-4B",
+            "TASKS": "gsm8k",
+            "LIMIT": "",
+            "NUM_CONCURRENT": "8"
+          }
+        },
+        "evaluation_seconds": "474.99488696921617"
+      },
+      "optimized": {
+        "benchmark_strategies": 10,
+        "benchmark_request_counts": {
+          "successful": 1505,
+          "errored": 0,
+          "incomplete": 673
+        },
+        "benchmark_workload": {
+          "created_at_utc": "2026-10-07T20:57:04.827117+00:00",
+          "kind": "benchmark",
+          "label": "optimized",
+          "platform": "Linux-6.12.95+deb13-amd64-x86_64-with-glibc2.41",
+          "tools": {
+            "guidellm": "0.7.4",
+            "lm-eval": "0.4.13"
+          },
+          "workload": {
+            "TOKENIZER": "Qwen/Qwen3-4B",
+            "PROMPT_TOKENS": "256",
+            "OUTPUT_TOKENS": "128",
+            "MAX_SECONDS": "30"
+          }
+        },
+        "evaluation_samples": {
+          "gsm8k": {
+            "original": 1319,
+            "effective": 1319
+          }
+        },
+        "evaluation_scores": {
+          "gsm8k": {
+            "name": "gsm8k",
+            "alias": "gsm8k",
+            "sample_len": 1319,
+            "exact_match,strict-match": 0.8438210765731615,
+            "exact_match_stderr,strict-match": 0.009999509369757445,
+            "exact_match,flexible-extract": 0.8347232752084913,
+            "exact_match_stderr,flexible-extract": 0.010231031118582127
+          }
+        },
+        "evaluation_workload": {
+          "created_at_utc": "2026-10-07T21:03:07.535032+00:00",
+          "kind": "eval",
+          "label": "optimized",
+          "platform": "Linux-6.12.95+deb13-amd64-x86_64-with-glibc2.41",
+          "tools": {
+            "guidellm": "0.7.4",
+            "lm-eval": "0.4.13"
+          },
+          "workload": {
+            "TOKENIZER": "Qwen/Qwen3-4B",
+            "TASKS": "gsm8k",
+            "LIMIT": "",
+            "NUM_CONCURRENT": "8"
+          }
+        },
+        "evaluation_seconds": "361.42087096441537"
+      }
+    }
+  },
+  "comparison": "Both smoke and full comparisons passed workload and evaluation compatibility checks.",
+  "interpretation": "A single paired run, not a repeated performance study. The full benchmark sweeps include 721 baseline and 673 optimized requests incomplete at the measurement cutoff; there were no errored requests. Inspect per-strategy results before interpreting throughput.",
+  "cleanup": "Passed: all eight smoke/full result JSON hashes unchanged, both Part 2 checkpoints retained, tutorial containers and test-created volumes removed. GPU returned to 47 MiB usage; unrelated containers remained running.",
+  "unverified": [
+    "ROCm exact model and benchmark workflow",
+    "XPU exact model and benchmark workflow",
+    "WSL2",
+    "Docker daemon (hardware test used Podman)"
+  ],
+  "metal_record": "2026-10-07-metal.json",
+  "concurrency_control_followup": {
+    "general_default": 512,
+    "macos_regressions": 40,
+    "linux_regressions": 40,
+    "retained_cuda_comparison": "passed with the updated code",
+    "hardware_scope": "CUDA hardware runs predate the configurable cap and used the same GuideLLM default of 512; they were not repeated for this configuration-only change."
+  }
+}

@@ -1,6 +1,7 @@
 #!/bin/sh
 set -eu
 
+# shellcheck source=scripts/tools.sh
 . "$(CDPATH='' cd "$(dirname "$0")" && pwd)/scripts/tools.sh"
 
 tasks="${TASKS:-gsm8k}"
@@ -21,12 +22,11 @@ check_label "$label"
 ensure_tools
 require_server
 
-output_dir="$results_dir/eval-$label"
-log_file="$results_dir/eval-$label.log"
-mkdir -p "$results_dir"
-if [ -d "$output_dir" ]; then
-  rm -rf "$output_dir"
-fi
+mkdir -p "$results_dir/runs"
+run_dir="$(mktemp -d "$results_dir/runs/eval-$label.XXXXXX")"
+output_dir="$run_dir/output"
+log_file="$run_dir/eval.log"
+export TOKENIZER="$tokenizer" TASKS="$tasks" LIMIT="$limit" NUM_CONCURRENT="$num_concurrent"
 
 set -- \
   --model local-completions \
@@ -42,7 +42,7 @@ else
   echo "Evaluating $tasks on the full test set."
 fi
 
-status_file="$results_dir/.eval-$label.status"
+status_file="$run_dir/status"
 {
   "$tools_venv/bin/lm_eval" "$@" 2>&1 &&
     echo 0 > "$status_file" || echo 1 > "$status_file"
@@ -55,6 +55,8 @@ if [ "$status" != "0" ]; then
   exit 1
 fi
 
+"$tools_venv/bin/python" "$project_dir/scripts/results.py" eval "$label" "$run_dir" "$results_dir"
 echo
+echo "Latest successful run: $results_dir/eval-$label.latest"
 echo "Saved $output_dir"
 echo "Saved $log_file"

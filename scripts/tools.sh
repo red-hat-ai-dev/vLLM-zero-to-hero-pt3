@@ -1,3 +1,5 @@
+# shellcheck shell=sh
+# shellcheck disable=SC2034 # Variables are consumed by the sourcing scripts.
 # Shared helpers for benchmark.sh, evaluate.sh, and compare.sh.
 # Installs GuideLLM and lm-eval into .venv the first time they are needed.
 
@@ -13,7 +15,12 @@ error() {
 }
 
 find_python() {
-  for candidate in ${PYTHON:-} python3.13 python3.12 python3.11 python3.10 python3; do
+  if [ -n "${PYTHON:-}" ]; then
+    set -- "$PYTHON"
+  else
+    set -- python3.13 python3.12 python3.11 python3.10 python3
+  fi
+  for candidate in "$@"; do
     [ -n "$candidate" ] || continue
     command -v "$candidate" >/dev/null 2>&1 || continue
     if "$candidate" -c 'import sys; sys.exit(0 if (3, 10) <= sys.version_info[:2] <= (3, 13) else 1)' 2>/dev/null; then
@@ -25,7 +32,8 @@ find_python() {
 }
 
 ensure_tools() {
-  if [ -x "$tools_venv/bin/guidellm" ] && [ -x "$tools_venv/bin/lm_eval" ]; then
+  if [ -x "$tools_venv/bin/guidellm" ] && [ -x "$tools_venv/bin/lm_eval" ] &&
+    "$tools_venv/bin/python" -c 'import guidellm, lm_eval; import importlib.metadata as m; assert m.version("guidellm") == "0.7.4"; assert m.version("lm-eval") == "0.4.13"' >/dev/null 2>&1; then
     return
   fi
 
@@ -51,7 +59,6 @@ ensure_tools() {
     if ! "$tools_venv/bin/python" -m pip install --quiet torch \
       --index-url https://download.pytorch.org/whl/cpu; then
       error "Could not install PyTorch."
-      rm -rf "$tools_venv"
       exit 1
     fi
   fi
@@ -59,18 +66,24 @@ ensure_tools() {
   if ! "$tools_venv/bin/python" -m pip install --quiet -r "$project_dir/requirements.txt"; then
     error "Could not install GuideLLM and lm-eval."
     echo "Review the pip output above, then try again." >&2
-    rm -rf "$tools_venv"
     exit 1
   fi
   echo "GuideLLM and lm-eval are installed."
 }
 
 require_server() {
-  if ! curl --fail --silent "http://127.0.0.1:$port/v1/models" >/dev/null 2>&1; then
-    error "No vLLM server is answering at http://127.0.0.1:$port/v1"
-    echo "Start one first, for example: ./run.sh baseline" >&2
-    exit 1
-  fi
+  "$tools_venv/bin/python" - "$port" "$served_model" <<'PYCODE'
+import json
+import sys
+import urllib.request
+try:
+    with urllib.request.urlopen(f"http://127.0.0.1:{sys.argv[1]}/v1/models", timeout=5) as response:
+        models = json.load(response)
+    if sys.argv[2] not in {model["id"] for model in models["data"]}:
+        raise ValueError(f"Expected model alias {sys.argv[2]} is not being served")
+except Exception as exc:
+    raise SystemExit(f"Server check failed: {exc}. Start ./run.sh first.")
+PYCODE
 }
 
 check_label() {

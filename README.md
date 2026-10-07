@@ -15,6 +15,8 @@ This is how the pipeline is going to look: you serve a model with vLLM, benchmar
 Want to know what the scripts are doing? Read
 [Behind the scenes](BEHIND_THE_SCENES.md).
 
+See [tested support and validation](SUPPORT.md) for the exact platforms, versions, and remaining checks.
+
 ## What you will learn
 
 - How to run a GuideLLM sweep against a live vLLM endpoint
@@ -114,7 +116,16 @@ Both models are served under the same name, `qwen3-4b`, so every command in this
 
 ## 3. Benchmark the baseline model
 
-Keep vLLM running and use another terminal:
+Keep vLLM running and use another terminal.
+
+On Apple Silicon, set the tested concurrency cap in that terminal and keep it
+for both the baseline and optimized benchmarks:
+
+```bash
+export MAX_CONCURRENCY=8
+```
+
+Then run the baseline benchmark:
 
 ```bash
 ./benchmark.sh baseline
@@ -122,12 +133,12 @@ Keep vLLM running and use another terminal:
 
 The first run installs GuideLLM and lm-eval in a `.venv` folder inside this repository. Later runs reuse it.
 
-The script runs this GuideLLM command:
+The wrapper uses these GuideLLM settings (shown with standalone output paths):
 
 ```bash
 guidellm run \
   --backend kind=openai_http,target=http://127.0.0.1:8000,model=qwen3-4b \
-  --profile kind=sweep \
+  --profile "kind=sweep,max_concurrency=${MAX_CONCURRENCY:-512}" \
   --constraint kind=max_duration,seconds=30 \
   --data kind=synthetic_text,prompt_tokens=256,output_tokens=128 \
   --tokenizer kind=huggingface_auto,model=Qwen/Qwen3-4B \
@@ -135,11 +146,11 @@ guidellm run \
   --output kind=html,path=results/benchmark-baseline.html
 ```
 
-The sweep runs 10 benchmarks at 30 seconds each, so expect it to take about 5 minutes. When it finishes, the results are saved in the `results/` folder:
+The adaptive sweep targets up to 10 benchmarks at 30 seconds each, plus setup, warmup, and shutdown time. It may stop earlier when a measured rate is invalid or a stopping constraint is reached. When it finishes, the results are saved in the `results/` folder:
 
-- `benchmark-baseline.json`: every statistic, for reloading and comparing
-- `benchmark-baseline.html`: a self-contained report with charts. Open it in a browser.
-- `benchmark-baseline.log`: the tables printed to the terminal
+- `benchmark-baseline.latest/benchmark.json`: every statistic, for reloading and comparing
+- `benchmark-baseline.latest/benchmark.html`: a self-contained report with charts. Open it in a browser.
+- `benchmark-baseline.latest/benchmark.log`: the tables printed to the terminal
 
 ### What we are seeing
 
@@ -169,7 +180,7 @@ The two tables to focus on are the last two.
 - **Requests Per Sec:** how many requests completed per second.
 - **Input, Output, and Total Tokens Per Sec:** how many tokens the server processed per second. Output tokens per second is the usual headline throughput number.
 
-Read the tables from top to bottom. The `synchronous` row shows the lowest latency the model can deliver. The `throughput` row shows the most tokens per second the server can produce. In the `constant` rows, the latency grows as the request rate rises. When the completed requests per second stop keeping up with the target rate, the server has reached its limit.
+Read the tables from top to bottom. The `synchronous` row measures latency with one request at a time. The `throughput` row measures throughput under the configured concurrency cap. In the `constant` rows, the latency grows as the request rate rises. When completed requests per second stop keeping up with the target rate, the server is falling behind for that workload.
 
 The terminal labels every rate-based row as `constant`. The target rate of each row is in the HTML report and the JSON file.
 
@@ -179,7 +190,8 @@ The script accepts a few settings as environment variables:
 
 | Setting | Default | What it changes |
 | --- | --- | --- |
-| `MAX_SECONDS` | `30` | How long each of the 10 benchmarks runs |
+| `MAX_SECONDS` | `30` | Measurement window for each strategy in the adaptive sweep |
+| `MAX_CONCURRENCY` | `512` | Positive integer limiting concurrent requests in the throughput and constant-rate strategies |
 | `PROMPT_TOKENS` | `256` | The length of each synthetic prompt |
 | `OUTPUT_TOKENS` | `128` | The number of tokens generated for each request |
 | `PORT` | `8000` | The port of the vLLM server |
@@ -189,6 +201,22 @@ For example, to simulate a workload with long documents and short answers:
 ```bash
 PROMPT_TOKENS=2048 OUTPUT_TOKENS=64 ./benchmark.sh baseline
 ```
+
+On a local machine, start with a bounded load and use the same settings for both
+models. For example, to cap the sweep at eight concurrent requests:
+
+```bash
+MAX_CONCURRENCY=8 ./benchmark.sh baseline
+MAX_CONCURRENCY=8 ./benchmark.sh optimized
+```
+
+Run each command while its corresponding model is serving. The concurrency cap
+is saved in `run.json`; comparison rejects different caps or missing provenance
+on one side. Both models need new runs when changing the cap. A zero-completion
+strategy is still rejected. On the tested M4 Pro, the default 512-concurrency
+BF16 throughput strategy completed no requests in either 10 or 30 seconds;
+both models completed all ten strategies with the eight-request cap at 30
+seconds per strategy. See [the support record](SUPPORT.md) for the tested scope.
 
 GuideLLM itself is installed in `.venv/bin/guidellm`, so you can also run it directly. Every option uses the form `--<option> kind=<type>,key=value`. The main options are:
 
@@ -215,6 +243,11 @@ For example, to measure the experience of 1, 4, 16, and 64 simultaneous users:
 
 Run `.venv/bin/guidellm run --help` for every option, or read the
 [GuideLLM documentation](https://github.com/vllm-project/guidellm/tree/main/docs).
+
+Each wrapper saves a separate run under `results/runs/`. The `.latest` link
+changes only after the tool succeeds and its JSON is readable. Failed runs keep
+their logs and earlier successful runs remain available. Direct tool commands
+above write their own paths and do not use this protection.
 
 ## 4. Evaluate the baseline model
 
@@ -263,7 +296,7 @@ When it finishes, lm-eval prints a results table:
 - **Value:** the fraction of problems answered correctly. `0.85` means 85 percent.
 - **Stderr:** the standard error of the score. A difference between two runs that is smaller than about two standard errors could be noise.
 
-The results are saved in `results/eval-baseline/`. Because of `--log_samples`, this folder also includes every prompt, response, and extracted answer, so you can read exactly which problems the model got wrong.
+The results are saved in `results/eval-baseline.latest/output/`. Because of `--log_samples`, this folder also includes every prompt, response, and extracted answer, so you can read exactly which problems the model got wrong.
 
 ### What the options are
 
@@ -333,7 +366,7 @@ The script reads both sets of results and prints them side by side with the chan
 
 Use the performance rows to decide how much faster the optimized model is, and the accuracy rows to decide how much quality it gave up. Whether the tradeoff is worth it depends on the workload.
 
-You can also open `results/benchmark-baseline.html` and `results/benchmark-optimized.html` in a browser to compare the charts.
+You can also open `results/benchmark-baseline.latest/benchmark.html` and `results/benchmark-optimized.latest/benchmark.html` in a browser to compare the charts.
 
 ## Stop and clean up
 
@@ -367,3 +400,10 @@ with your platform, the command you tried, and the error message.
 ---
 
 [Back to the vLLM Zero to Hero overview](https://github.com/red-hat-ai-dev/vLLM-zero-to-hero-overview)
+
+Comparison requires matching workload settings and tool versions for benchmark
+runs. Evaluations must have matching task definitions, versions, few-shot
+settings, effective sample counts, and random seeds. A 20-example smoke test
+cannot be compared to a full GSM8K run. Old benchmark files without provenance
+must be rerun; they remain on disk. Only accuracy metrics are displayed as
+percent correct, and missing latency statistics are shown as `--`.
