@@ -9,11 +9,11 @@ That's where benchmarking and evaluation come in! In this section, we're going t
 This is how the pipeline is going to look: you serve a model with vLLM, benchmark it with GuideLLM, evaluate it with lm-eval, repeat the same steps for the optimized model, and compare the results.
 
 <p align="center">
-  <img src="assets/benchmark-pipeline.svg" alt="The benchmarking pipeline: serve, benchmark, evaluate, and compare" width="100%">
+  <img src="docs/assets/benchmark-pipeline.svg" alt="The benchmarking pipeline: serve, benchmark, evaluate, and compare" width="100%">
 </p>
 
 Want to know what the scripts are doing? Read
-[Behind the scenes](BEHIND_THE_SCENES.md).
+[Behind the scenes](docs/BEHIND_THE_SCENES.md).
 
 ## What you will learn
 
@@ -50,7 +50,7 @@ Keep in mind that latency and throughput generally go against each other. (Ex. A
 This part uses GuideLLM's **sweep** profile to measure the whole range in one command:
 
 <p align="center">
-  <img src="assets/guidellm-sweep.svg" alt="A GuideLLM sweep: one synchronous benchmark, one throughput benchmark, and eight constant-rate benchmarks" width="100%">
+  <img src="docs/assets/guidellm-sweep.svg" alt="A GuideLLM sweep: one synchronous benchmark, one throughput benchmark, and eight constant-rate benchmarks" width="100%">
 </p>
 
 1. **Synchronous** sends one request at a time. This is the best-case latency for a single user.
