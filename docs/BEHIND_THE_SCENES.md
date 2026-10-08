@@ -5,6 +5,23 @@ Part 3 has two halves. `run.sh` starts a vLLM server the same way as Part 1.
 outside through its OpenAI-compatible API, so they work the same on every
 platform.
 
+The [README](../README.md) is the walkthrough, including how to read the
+results. This guide explains how the scripts fit together.
+
+## What is in this repository?
+
+| File or folder | What it does |
+| --- | --- |
+| [`run.sh`](../run.sh), [`stop.sh`](../stop.sh), [`cleanup.sh`](../cleanup.sh) | Manage the model server and local setup. |
+| [`benchmark.sh`](../benchmark.sh) | Measures latency and throughput with GuideLLM. |
+| [`evaluate.sh`](../evaluate.sh) | Measures answer accuracy with lm-eval. |
+| [`compare.sh`](../compare.sh) | Compares two sets of saved results. |
+| [`scripts/`](../scripts) | Holds shared shell helpers, result handling, comparison code, and tool requirements. |
+| [`docs/assets/`](assets) | Holds the diagrams used in the walkthrough. |
+
+The tools create `.venv/` and `results/` locally when you use them. You do not
+need to edit the supporting files to follow the lesson.
+
 ## What `run.sh` does
 
 `run.sh` takes the model to serve, `baseline` or `optimized`, and optionally an
@@ -30,7 +47,8 @@ never change between runs.
 
 | Platform | `baseline` | `optimized` |
 | --- | --- | --- |
-| Linux | `Qwen/Qwen3-4B` | `RedHatAI/Qwen3-4B-FP8-dynamic` |
+| CUDA | `Qwen/Qwen3-4B` | `RedHatAI/Qwen3-4B-FP8-dynamic` |
+| ROCm (hardware validation pending) | `Qwen/Qwen3-4B` | `RedHatAI/Qwen3-4B-FP8-dynamic` |
 | Apple Silicon | `mlx-community/Qwen3-4B-bf16` | `mlx-community/Qwen3-4B-4bit` |
 
 Each model can be replaced with an environment variable:
@@ -64,7 +82,12 @@ pass a Hugging Face token into the container.
 
 Accelerator detection, `ENGINE`, NVIDIA Container Toolkit checks, and
 automatic cleanup of failed starts all work as described in
-[Part 1](https://github.com/red-hat-ai-dev/vLLM-zero-to-hero-pt1/blob/main/BEHIND_THE_SCENES.md).
+[Part 1](https://github.com/red-hat-ai-dev/vLLM-zero-to-hero-pt1).
+
+[`scripts/engine.sh`](../scripts/engine.sh) is the helper used by `stop.sh` and
+`cleanup.sh` to locate the engine that owns the managed container or volume.
+It verifies the container's project label and asks for an explicit `ENGINE`
+if separate project resources exist in both Podman and Docker.
 
 ### CPU
 
@@ -98,7 +121,7 @@ started. `./stop.sh` stops either model.
 
 The first `./benchmark.sh`, `./evaluate.sh`, or `./compare.sh` creates a Python
 virtual environment in `.venv` and installs the versions pinned in
-`requirements.txt`:
+[`scripts/requirements.txt`](../scripts/requirements.txt):
 
 ```text
 guidellm[recommended]==0.7.4
@@ -118,23 +141,34 @@ somewhere else.
 
 ```text
 results/
-  benchmark-baseline.json
-  benchmark-baseline.html
-  benchmark-baseline.log
-  eval-baseline/qwen3-4b/results_<timestamp>.json
-  eval-baseline/qwen3-4b/samples_gsm8k_<timestamp>.jsonl
-  eval-baseline.log
+  benchmark-baseline.latest -> runs/benchmark-baseline.<run-id>/
+  eval-baseline.latest -> runs/eval-baseline.<run-id>/
+  runs/
+    benchmark-baseline.<run-id>/
+      benchmark.json
+      benchmark.html
+      benchmark.log
+      run.json
+    eval-baseline.<run-id>/
+      output/  # lm-eval scores and per-question samples
+      eval.log
+      run.json
 ```
+
+Each run has its own directory. After a successful run, `scripts/results.py`
+checks the expected report, records the tool versions and workload settings,
+and updates the corresponding `.latest` link. Failed reruns leave the previous
+successful link in place and keep their output for diagnosis.
 
 ## What `benchmark.sh` does
 
 `benchmark.sh` checks that a server answers at `/v1/models`, then runs one
-GuideLLM sweep:
+GuideLLM sweep. These are the options, with simple standalone output paths:
 
 ```bash
 guidellm run \
   --backend kind=openai_http,target=http://127.0.0.1:8000,model=qwen3-4b \
-  --profile kind=sweep \
+  --profile "kind=sweep,max_concurrency=${MAX_CONCURRENCY:-512}" \
   --constraint kind=max_duration,seconds=30 \
   --data kind=synthetic_text,prompt_tokens=256,output_tokens=128 \
   --tokenizer kind=huggingface_auto,model=Qwen/Qwen3-4B \
@@ -152,13 +186,18 @@ guidellm run \
 - `--disable-console-interactive` replaces the live progress display with
   plain log lines, so the saved log file stays readable.
 
+The default concurrency cap is 512. The walkthrough recommends
+`MAX_CONCURRENCY=8` on Apple Silicon and a smaller workload on CPU. Keep the
+same settings for both sides of a comparison.
+
 The HTML report is built from a page template that GuideLLM downloads when the
 benchmark finishes, so the report needs internet access. The JSON file does
 not.
 
 ## What `evaluate.sh` does
 
-`evaluate.sh` runs lm-eval against the same server:
+`evaluate.sh` runs lm-eval against the same server. With a standalone output
+path, the command looks like this:
 
 ```bash
 lm_eval \
@@ -178,7 +217,8 @@ lm_eval \
   change it.
 - `num_concurrent=8` sends eight problems at a time so the run finishes
   sooner. GSM8K uses greedy decoding (`temperature=0`).
-- Each run replaces the previous results for the same label.
+- The output goes into a new run directory; only the `.latest` link for that
+  label changes after success.
 
 ## What `compare.sh` does
 
@@ -200,6 +240,11 @@ From each GuideLLM JSON file it reads:
 From each lm-eval results file it reads every `exact_match` score and shows the
 difference in percentage points.
 
+Before comparing, it checks the saved workload settings and evaluation
+metadata, including the task version and sample count. Mismatched or missing
+metadata produces an error so you can rerun both sides with matching settings.
+It also validates the GuideLLM report structure and the reported workload.
+
 ## Complete local cleanup
 
 `./cleanup.sh` lists what it will remove and asks for confirmation. It stops the
@@ -208,7 +253,16 @@ server, then removes:
 - On Linux, the `vllm-zero-to-hero` container and the `vllm-models` volume. This
   volume is shared with Part 1.
 - On Apple Silicon, the two MLX models from the Hugging Face cache. The vLLM
-  Metal environment is kept, because Part 1 manages it.
+  Metal environment is kept for reuse across the lessons.
 - The `.venv` tools environment and temporary state.
 
 The `results/` folder is never removed.
+
+## Tested support
+
+The [Part 3 RFC](https://github.com/red-hat-ai-dev/vLLM-zero-to-hero-pt3/issues/3)
+holds validation results, exact environments, and remaining platform checks.
+Performance and accuracy depend on the model, workload, and hardware recorded
+with each result.
+
+[Back to the walkthrough](../README.md)

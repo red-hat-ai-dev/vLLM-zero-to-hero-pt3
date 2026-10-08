@@ -63,7 +63,7 @@ ensure_tools() {
     fi
   fi
 
-  if ! "$tools_venv/bin/python" -m pip install --quiet -r "$project_dir/requirements.txt"; then
+  if ! "$tools_venv/bin/python" -m pip install --quiet -r "$project_dir/scripts/requirements.txt"; then
     error "Could not install GuideLLM and lm-eval."
     echo "Review the pip output above, then try again." >&2
     exit 1
