@@ -47,7 +47,8 @@ never change between runs.
 
 | Platform | `baseline` | `optimized` |
 | --- | --- | --- |
-| Linux GPU | `Qwen/Qwen3-4B` | `RedHatAI/Qwen3-4B-FP8-dynamic` |
+| CUDA | `Qwen/Qwen3-4B` | `RedHatAI/Qwen3-4B-FP8-dynamic` |
+| ROCm (hardware validation pending) | `Qwen/Qwen3-4B` | `RedHatAI/Qwen3-4B-FP8-dynamic` |
 | Apple Silicon | `mlx-community/Qwen3-4B-bf16` | `mlx-community/Qwen3-4B-4bit` |
 
 Each model can be replaced with an environment variable:
