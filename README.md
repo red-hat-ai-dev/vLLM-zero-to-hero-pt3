@@ -81,12 +81,23 @@ The platform paths are:
 | Apple Silicon Mac | Native vLLM Metal with `mlx-community/Qwen3-4B-bf16` | Native vLLM Metal with `mlx-community/Qwen3-4B-4bit` | Local Python environment |
 | Linux with NVIDIA | CUDA container | CUDA container; primary path for this part | Local Python environment |
 | Linux with AMD | ROCm container | Try with the current vLLM ROCm support and verify locally | Local Python environment |
+| x86-64 CPU (experimental) | CPU container | Not enabled for CPU | Local Python environment |
 
 The FP8 checkpoint from Part 2 does not run on vLLM Metal, so the Mac path compares the full-precision MLX model with a four-bit MLX model instead. On NVIDIA, FP8 runs at full speed on GPUs with compute capability 8.9 or newer, such as the L4, L40S, and H100. Ampere GPUs such as the A100 run it as weight-only FP8, so the speedup is smaller.
 
 Linux container access must already work for the detected accelerator, the same as in Part 1. NVIDIA users also need
 [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
 configured for Docker or Podman. Windows users can follow the Linux path from a compatible WSL2 environment.
+
+For experimental CPU serving, use `./run.sh baseline cpu` in an x86-64 Linux
+runtime with Docker or Podman. This option serves the baseline only, with a
+4,096-token context and at most four concurrent requests. Stop and cleanup
+work as usual.
+
+On CPU, start with `MAX_CONCURRENCY=2 OUTPUT_TOKENS=32 ./benchmark.sh baseline`
+and `LIMIT=5 NUM_CONCURRENT=1 ./evaluate.sh baseline`. These short runs check the
+tools; they are not a full accuracy evaluation. The optimized comparison needs
+one of the GPU paths above.
 
 ## 1. Clone
 

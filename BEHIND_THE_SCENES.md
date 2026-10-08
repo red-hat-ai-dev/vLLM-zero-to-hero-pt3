@@ -15,7 +15,7 @@ accelerator override:
 ./run.sh optimized nvidia
 ```
 
-Both models are served with the same settings. Only the checkpoint changes:
+On GPU, both models are served with the same settings. Only the checkpoint changes:
 
 ```bash
 vllm serve MODEL \
@@ -65,6 +65,14 @@ pass a Hugging Face token into the container.
 Accelerator detection, `ENGINE`, NVIDIA Container Toolkit checks, and
 automatic cleanup of failed starts all work as described in
 [Part 1](https://github.com/red-hat-ai-dev/vLLM-zero-to-hero-pt1/blob/main/BEHIND_THE_SCENES.md).
+
+### CPU
+
+`./run.sh baseline cpu` uses `vllm/vllm-openai-cpu:v0.28.0-x86_64` in an
+x86-64 Linux runtime, without GPU devices. It keeps the same model alias and
+cache volume, with BF16, eager execution, a 4,096-token context, a 1 GiB KV cache,
+and at most four concurrent requests. One CPU core is reserved for the API.
+Only baseline serving is enabled; benchmarking and evaluation use the same API.
 
 ### Apple Silicon
 

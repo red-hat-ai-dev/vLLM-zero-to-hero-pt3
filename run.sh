@@ -22,7 +22,7 @@ backend=""
 metal_pid=""
 
 usage() {
-  echo "Usage: ./run.sh baseline|optimized [nvidia|amd|metal]" >&2
+  echo "Usage: ./run.sh baseline|optimized [nvidia|amd|metal|cpu]" >&2
 }
 
 error() {
@@ -226,7 +226,7 @@ detect_accelerator() {
 
   if [ -z "$accelerator" ]; then
     error "No supported NVIDIA or AMD accelerator was detected."
-    echo "You can override detection with ./run.sh $mode nvidia or amd." >&2
+    echo "You can override detection with ./run.sh $mode nvidia, amd, or cpu." >&2
     exit 1
   fi
 }
@@ -241,7 +241,7 @@ check_port_free() {
 
 run_linux() {
   case "$requested" in
-    auto|nvidia|amd) ;;
+    auto|nvidia|amd|cpu) ;;
     metal)
       error "vLLM Metal is available only on an Apple Silicon Mac."
       exit 1
@@ -286,6 +286,19 @@ run_linux() {
       set -- --device /dev/kfd --device /dev/dri --group-add video \
         --cap-add SYS_PTRACE --security-opt seccomp=unconfined
       ;;
+    cpu)
+      if [ "$(uname -m)" != "x86_64" ]; then
+        error "The CPU example currently requires an x86-64 Linux environment."
+        exit 1
+      fi
+      if [ "$mode" != "baseline" ]; then
+        error "The CPU example currently supports baseline serving only."
+        exit 1
+      fi
+      image="docker.io/vllm/vllm-openai-cpu:v0.28.0-x86_64"
+      max_model_len="4096"
+      set -- -e VLLM_CPU_KVCACHE_SPACE=1 -e VLLM_CPU_NUM_OF_RESERVED_CPU=1
+      ;;
     *)
       error "Unknown accelerator: $accelerator"
       usage
@@ -308,7 +321,7 @@ run_linux() {
 
   echo "Starting vLLM with the $mode model: $model"
   echo "The first run also downloads the model."
-  if ! "$engine" run -d --name "$name" "$@" --ipc=host \
+  set -- "$@" --ipc=host \
     -p "127.0.0.1:$port:8000" \
     -v "$volume:/root/.cache/huggingface" \
     --label "$managed_label=true" "$image" \
@@ -316,7 +329,11 @@ run_linux() {
     --host 0.0.0.0 \
     --port 8000 \
     --served-model-name "$served_model" \
-    --max-model-len "$max_model_len"; then
+    --max-model-len "$max_model_len"
+  if [ "$accelerator" = "cpu" ]; then
+    set -- "$@" --dtype bfloat16 --max-num-seqs 4 --enforce-eager
+  fi
+  if ! "$engine" run -d --name "$name" "$@"; then
     cleanup_partial_container
     error "$engine could not start the vLLM container."
     echo "Review the error above. A partial container created by this launcher was removed when present." >&2
@@ -370,7 +387,7 @@ install_metal() {
 run_macos() {
   case "$requested" in
     auto|metal) ;;
-    nvidia|amd)
+    nvidia|amd|cpu)
       error "$requested acceleration through this launcher requires Linux."
       echo "On Apple Silicon, run ./run.sh $mode without an override to use Metal." >&2
       exit 1
