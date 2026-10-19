@@ -348,6 +348,10 @@ If the script reports mismatched settings, rerun both models with the same
 benchmark settings and evaluation sample limit. Results from an older version
 of these scripts may also need a rerun.
 
+The two runs can use different server ports. For each run, use that server's
+`PORT` for both `benchmark.sh` and `evaluate.sh`. `compare.sh` reads the saved
+results, so it does not need a running server or a `PORT` setting.
+
 The script reads both sets of results and prints them side by side with the change between them:
 
 | Row | What it tells you |
