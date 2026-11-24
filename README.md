@@ -78,9 +78,9 @@ The platform paths are:
 
 | Platform | Baseline serving | Optimized serving | Benchmark and evaluation |
 | --- | --- | --- | --- |
-| Apple Silicon Mac | Native vLLM Metal with `mlx-community/Qwen3-4B-bf16` | Native vLLM Metal with `mlx-community/Qwen3-4B-4bit` | Local Python environment |
-| Linux with NVIDIA | CUDA container | CUDA container; primary path for this part | Local Python environment |
-| Linux with AMD | ROCm container | Try with the current vLLM ROCm support and verify locally | Local Python environment |
+| Apple Silicon Mac (macOS 15+) | Native vLLM Metal with `mlx-community/Qwen3-4B-bf16` | Native vLLM Metal with `mlx-community/Qwen3-4B-4bit` | Local Python environment |
+| x86-64 Linux with NVIDIA | CUDA container | CUDA container; primary path for this part | Local Python environment |
+| x86-64 Linux with AMD | ROCm container | Try with the current vLLM ROCm support and verify locally | Local Python environment |
 | x86-64 CPU (experimental) | CPU container | Not enabled for CPU | Local Python environment |
 
 The FP8 checkpoint from Part 2 does not run on vLLM Metal, so the Mac path compares the full-precision MLX model with a four-bit MLX model instead. On NVIDIA, FP8 runs at full speed on GPUs with compute capability 8.9 or newer, such as the L4, L40S, and H100. Ampere GPUs such as the A100 run it as weight-only FP8, so the speedup is smaller.
@@ -124,9 +124,9 @@ Both models are served under the same name, `qwen3-4b`, so every command in this
 
 ## 3. Benchmark the baseline model
 
-Keep vLLM running and use another terminal.
+When the ready message appears, continue in the same terminal. The server runs in the background.
 
-On Apple Silicon, limit concurrent requests in that terminal and keep this setting
+On Apple Silicon, limit concurrent requests and keep this setting
 for both the baseline and optimized benchmarks:
 
 ```bash
