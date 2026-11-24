@@ -245,6 +245,11 @@ metadata, including the task version and sample count. Mismatched or missing
 metadata produces an error so you can rerun both sides with matching settings.
 It also validates the GuideLLM report structure and the reported workload.
 
+The serving endpoint recorded in each task's `metadata.base_url` is excluded
+from the comparison, allowing matching runs served on different ports. All
+other task configuration and metadata checks still apply, including tokenizer,
+generation settings, samples, and seeds. The saved result files are unchanged.
+
 ## Complete local cleanup
 
 `./cleanup.sh` lists what it will remove and asks for confirmation. It stops the

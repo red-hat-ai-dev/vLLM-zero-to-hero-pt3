@@ -1,5 +1,6 @@
 """Print the GuideLLM and lm-eval results of two runs side by side."""
 
+from copy import deepcopy
 import glob
 import json
 import math
@@ -122,6 +123,16 @@ def evaluation_scores(data):
     return scores
 
 
+def comparison_task_configs(configs):
+    """Exclude serving endpoints without changing the recorded task definitions."""
+    configs = deepcopy(configs)
+    for task in configs.values():
+        metadata = task.get("metadata")
+        if isinstance(metadata, dict):
+            metadata.pop("base_url", None)
+    return configs
+
+
 def validate_compatible_runs(first, second):
     """Reject unequal task definitions or effective samples before printing deltas."""
     for key in ("configs", "versions", "n-shot", "n-samples"):
@@ -129,7 +140,10 @@ def validate_compatible_runs(first, second):
             raise ValueError(
                 f"Evaluation is missing {key}; compatibility cannot be established"
             )
-        if first[key] != second[key]:
+        a, b = first[key], second[key]
+        if key == "configs":
+            a, b = comparison_task_configs(a), comparison_task_configs(b)
+        if a != b:
             raise ValueError(
                 f"Evaluation {key} differ; rerun with matching tasks and sample counts"
             )
