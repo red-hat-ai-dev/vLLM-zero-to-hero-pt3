@@ -20,7 +20,7 @@ fi
 label="$1"
 check_label "$label"
 ensure_tools
-require_server
+serving_at_start="$(require_server)"
 
 mkdir -p "$results_dir/runs"
 run_dir="$(mktemp -d "$results_dir/runs/eval-$label.XXXXXX")"
@@ -55,7 +55,7 @@ if [ "$status" != "0" ]; then
   exit 1
 fi
 
-"$tools_venv/bin/python" "$project_dir/scripts/results.py" eval "$label" "$run_dir" "$results_dir"
+publish_results eval "$label" "$run_dir" "$results_dir" "$serving_at_start"
 echo
 echo "Latest successful run: $results_dir/eval-$label.latest"
 echo "Saved $output_dir"

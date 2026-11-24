@@ -4,6 +4,8 @@
 # Installs GuideLLM and lm-eval into .venv the first time they are needed.
 
 project_dir="$(CDPATH='' cd "$(dirname "$0")" && pwd)"
+# Maintainers can also source this file directly from the lesson root.
+if [ ! -f "$project_dir/scripts/tools.sh" ]; then project_dir="$PWD"; fi
 tools_venv="${TOOLS_VENV:-$project_dir/.venv}"
 results_dir="${RESULTS_DIR:-$project_dir/results}"
 port="${PORT:-8000}"
@@ -47,6 +49,10 @@ ensure_tools() {
   echo "Installing them in $tools_venv with $python."
   echo "This is a one-time setup and may take several minutes."
 
+  # Only a local environment created by this lesson is eligible for cleanup.
+  if [ "$tools_venv" = "$project_dir/.venv" ] && mkdir "$tools_venv" 2>/dev/null; then
+    touch "$tools_venv/.vllm-zero-to-hero-pt3"
+  fi
   if ! "$python" -m venv "$tools_venv"; then
     error "Could not create a Python virtual environment at $tools_venv."
     exit 1
@@ -72,18 +78,12 @@ ensure_tools() {
 }
 
 require_server() {
-  "$tools_venv/bin/python" - "$port" "$served_model" <<'PYCODE'
-import json
-import sys
-import urllib.request
-try:
-    with urllib.request.urlopen(f"http://127.0.0.1:{sys.argv[1]}/v1/models", timeout=5) as response:
-        models = json.load(response)
-    if sys.argv[2] not in {model["id"] for model in models["data"]}:
-        raise ValueError(f"Expected model alias {sys.argv[2]} is not being served")
-except Exception as exc:
-    raise SystemExit(f"Server check failed: {exc}. Start ./run.sh first.")
-PYCODE
+  "$tools_venv/bin/python" "$project_dir/scripts/serving.py" "$port" "$served_model"
+}
+
+publish_results() {
+  serving_at_finish="$(require_server)" || return 1
+  "$tools_venv/bin/python" "$project_dir/scripts/results.py" "$@" "$serving_at_finish"
 }
 
 check_label() {
