@@ -1,16 +1,16 @@
 #!/bin/sh
 set -eu
 
-name="vllm-zero-to-hero"
-volume="vllm-models"
+script_dir="$(CDPATH='' cd "$(dirname "$0")" && pwd)"
+# shellcheck source=scripts/engine.sh
+. "$script_dir/scripts/engine.sh"
+
 port="${PORT:-8000}"
-state_dir="${TMPDIR:-/tmp}/vllm-zero-to-hero"
-pid_file="$state_dir/metal.pid"
+state_dir="${TMPDIR:-/tmp}/vllm-zero-to-hero-pt3"
 log_file="$state_dir/metal.log"
 metal_venv="${VLLM_METAL_VENV:-$HOME/.venv-vllm-metal}"
 served_model="qwen3-4b"
 max_model_len="8192"
-managed_label="io.github.red-hat-ai-dev.vllm-zero-to-hero.managed"
 image_repo="${IMAGE_REPO:-ghcr.io/red-hat-ai-dev/vllm-zero-to-hero}"
 
 baseline_model="${BASELINE_MODEL:-Qwen/Qwen3-4B}"
@@ -19,7 +19,7 @@ metal_baseline_model="${METAL_BASELINE_MODEL:-mlx-community/Qwen3-4B-bf16}"
 metal_optimized_model="${METAL_OPTIMIZED_MODEL:-mlx-community/Qwen3-4B-4bit}"
 
 backend=""
-metal_pid=""
+metal_token=""
 
 usage() {
   echo "Usage: ./run.sh baseline|optimized [nvidia|amd|metal|cpu]" >&2
@@ -43,19 +43,15 @@ show_recent_logs() {
   if [ "$backend" = "metal" ]; then
     tail -n 40 "$log_file" >&2 2>/dev/null || true
   elif [ -n "${engine:-}" ]; then
-    "$engine" logs --tail 40 "$name" >&2 2>/dev/null || true
+    "$engine" logs --tail 40 "$container_id" >&2 2>/dev/null || true
   fi
 }
 
 cleanup_started_backend() {
   if [ "$backend" = "metal" ]; then
-    if [ -n "$metal_pid" ] && kill -0 "$metal_pid" 2>/dev/null; then
-      kill "$metal_pid" 2>/dev/null || true
-      wait "$metal_pid" 2>/dev/null || true
-    fi
-    rm -f "$pid_file"
+    "$script_dir/scripts/metal.sh" stop "$state_dir" "$metal_token"
   elif [ "$backend" = "container" ]; then
-    "$engine" rm --force "$name" >/dev/null 2>&1 || true
+    remove_launched_container || true
   fi
 }
 
@@ -68,9 +64,9 @@ cancel_start() {
 
 backend_is_running() {
   if [ "$backend" = "metal" ]; then
-    kill -0 "$metal_pid" 2>/dev/null
+    "$script_dir/scripts/metal.sh" status "$state_dir" "$metal_token" >/dev/null
   else
-    [ "$("$engine" inspect --format '{{.State.Running}}' "$name" 2>/dev/null || true)" = "true" ]
+    [ "$("$engine" inspect --format '{{.State.Running}}' "$container_id" 2>/dev/null || true)" = "true" ]
   fi
 }
 
@@ -137,16 +133,6 @@ engine_has_nvidia_support() {
       ;;
     *) return 1 ;;
   esac
-}
-
-cleanup_partial_container() {
-  label_value="$(
-    "$engine" inspect --format "{{ index .Config.Labels \"$managed_label\" }}" \
-      "$name" 2>/dev/null || true
-  )"
-  if [ "$label_value" = "true" ]; then
-    "$engine" rm --force "$name" >/dev/null 2>&1 || true
-  fi
 }
 
 show_nvidia_setup_error() {
@@ -324,7 +310,9 @@ run_linux() {
   set -- "$@" --ipc=host \
     -p "127.0.0.1:$port:8000" \
     -v "$volume:/root/.cache/huggingface" \
-    --label "$managed_label=true" "$image" \
+    --label "$managed_label=true" \
+    --label "${managed_label%.managed}.mode=$mode" \
+    --label "${managed_label%.managed}.backend=$accelerator" "$image" \
     "$served_path" \
     --host 0.0.0.0 \
     --port 8000 \
@@ -333,15 +321,17 @@ run_linux() {
   if [ "$accelerator" = "cpu" ]; then
     set -- "$@" --dtype bfloat16 --max-num-seqs 4 --enforce-eager
   fi
-  if ! "$engine" run -d --name "$name" "$@"; then
-    cleanup_partial_container
+  ensure_model_volume
+  backend="container"
+  container_id=""
+  launch_id=""
+  trap cancel_start INT TERM HUP
+  if ! start_lesson_container "$@"; then
     error "$engine could not start the vLLM container."
     echo "Review the error above. A partial container created by this launcher was removed when present." >&2
     exit 1
   fi
 
-  backend="container"
-  trap cancel_start INT TERM HUP
   wait_until_ready
 }
 
@@ -417,31 +407,26 @@ run_macos() {
     model="$metal_optimized_model"
   fi
 
-  mkdir -p "$state_dir"
-  if [ -f "$pid_file" ]; then
-    old_pid="$(cat "$pid_file" 2>/dev/null || true)"
-    if [ -n "$old_pid" ] && kill -0 "$old_pid" 2>/dev/null; then
-      error "A vLLM Metal server is already running."
-      echo "Run ./stop.sh before starting the $mode model." >&2
-      exit 1
-    fi
-    rm -f "$pid_file"
-  fi
-  check_port_free
-
   echo "Detected Apple Silicon."
   install_metal
 
   echo "Starting vLLM Metal with the $mode model: $model"
   echo "The first run also downloads the model."
-  : > "$log_file"
-  nohup "$metal_venv/bin/vllm" serve "$model" \
+  set -- "$metal_venv/bin/vllm" serve "$model" \
     --host 127.0.0.1 \
     --port "$port" \
     --served-model-name "$served_model" \
-    --max-model-len "$max_model_len" >"$log_file" 2>&1 &
-  metal_pid=$!
-  echo "$metal_pid" > "$pid_file"
+    --max-model-len "$max_model_len"
+  launch="$("$script_dir/scripts/metal.sh" start "$state_dir" "$mode" "$port" "$@")"
+  metal_token="${launch#* }"
+  if [ "${launch%% *}" = existing ]; then
+    if curl --connect-timeout 2 --max-time 5 --fail --silent "http://127.0.0.1:$port/v1/models" >/dev/null; then
+      echo "vLLM is already ready at http://127.0.0.1:$port/v1"
+      return
+    fi
+    error "The requested Metal server is already starting. See $log_file"
+    return 1
+  fi
   backend="metal"
   trap cancel_start INT TERM HUP
   wait_until_ready

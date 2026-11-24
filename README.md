@@ -112,7 +112,7 @@ cd vLLM-zero-to-hero-pt3
 ./run.sh baseline
 ```
 
-The launcher detects macOS or Linux and chooses the same family of paths used in Part 1. On an Apple Silicon Mac, this starts the native vLLM Metal path. On Linux, it starts `Qwen/Qwen3-4B` in the matching accelerator container.
+On an x86-64 Linux CPU-only machine, start with `./run.sh baseline cpu`. For a Mac or Linux GPU, the launcher detects the appropriate backend. On an Apple Silicon Mac, this starts the native vLLM Metal path. On Linux, it starts `Qwen/Qwen3-4B` in the matching accelerator container.
 
 Success looks like this:
 
@@ -311,6 +311,10 @@ The script accepts these settings as environment variables:
 
 ## 5. Serve, benchmark, and evaluate the optimized model
 
+**CPU-only learners:** your baseline results from steps 3 and 4 are ready in
+`results/`. Continue to [Stop and clean up](#stop-and-clean-up), or use a GPU
+machine to run both sides of the comparison.
+
 Stop the baseline server first:
 
 ```bash
@@ -323,10 +327,12 @@ Then start the optimized model:
 ./run.sh optimized
 ```
 
-On Linux, this starts the published `RedHatAI/Qwen3-4B-FP8-dynamic` checkpoint. To use the checkpoint you created in Part 2, pass its folder:
+On a Linux GPU, this starts the published `RedHatAI/Qwen3-4B-FP8-dynamic` checkpoint.
+If you cloned Parts 2 and 3 side by side, you can use the default checkpoint
+you created in Part 2 by starting the optimized server with this command instead:
 
 ```bash
-OPTIMIZED_MODEL=/path/to/vLLM-zero-to-hero-pt2/artifacts/<your-checkpoint> ./run.sh optimized
+OPTIMIZED_MODEL="../vLLM-zero-to-hero-pt2/artifacts/Qwen3-4B-FP8-Dynamic" ./run.sh optimized
 ```
 
 When the API is ready, run the identical benchmark and evaluation:
@@ -352,6 +358,12 @@ The two runs can use different server ports. For each run, use that server's
 `PORT` for both `benchmark.sh` and `evaluate.sh`. `compare.sh` reads the saved
 results, so it does not need a running server or a `PORT` setting.
 
+Both servers use the API name `qwen3-4b`. Check the checkpoint and launcher
+mode printed for each label before interpreting the numbers. If both runs used
+the same checkpoint, the comparison flags it so you can confirm that you meant
+to measure it twice. It stops if both labels point to one saved run or if a
+label's benchmark and evaluation used conflicting serving settings.
+
 The script reads both sets of results and prints them side by side with the change between them:
 
 | Row | What it tells you |
@@ -374,13 +386,15 @@ Stop the current server with:
 ./stop.sh
 ```
 
-To remove the downloaded models, the benchmarking tools, and temporary state, use:
+To preview and remove the resources owned by Part 3, run:
 
 ```bash
 ./cleanup.sh
 ```
 
-Cleanup shows exactly what it will remove and asks for confirmation. It does not remove the `results/` folder, so your benchmark and evaluation results are kept.
+Cleanup asks for confirmation before removing Part 3's server resources,
+local tools environment and temporary state. It keeps your `results/` folder,
+shared Mac model downloads, and the older Linux cache shared with Part 1.
 
 ## If something goes wrong
 
@@ -388,7 +402,7 @@ Cleanup shows exactly what it will remove and asks for confirmation. It does not
 - **Python is not supported:** GuideLLM and lm-eval need Python 3.10 through 3.13. Point `PYTHON` at a supported version, for example `PYTHON=python3.12 ./benchmark.sh baseline`.
 - **The `throughput` row shows errors or incomplete requests:** the server was overloaded. This is expected at maximum load. Errors in the `synchronous` row point to a problem with the server itself.
 - **The optimized model does not load:** FP8 support varies by accelerator and vLLM release. Try the NVIDIA path first, then check the current vLLM support for your accelerator.
-- **Port 8000 is busy:** run `./stop.sh` if a server from this series is still running. Otherwise, set another port for every command, for example `PORT=8001 ./run.sh baseline` and `PORT=8001 ./benchmark.sh baseline`.
+- **Port 8000 is busy:** use the stop command from the lesson that launched the server, or set another port for every command, for example `PORT=8001 ./run.sh baseline` and `PORT=8001 ./benchmark.sh baseline`.
 
 ## Need help?
 

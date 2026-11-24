@@ -30,7 +30,7 @@ if [ "$valid_concurrency" != true ]; then
   exit 1
 fi
 ensure_tools
-require_server
+serving_at_start="$(require_server)"
 
 mkdir -p "$results_dir/runs"
 run_dir="$(mktemp -d "$results_dir/runs/benchmark-$label.XXXXXX")"
@@ -66,7 +66,7 @@ if [ "$status" != "0" ]; then
   exit 1
 fi
 
-"$tools_venv/bin/python" "$project_dir/scripts/results.py" benchmark "$label" "$run_dir" "$results_dir"
+publish_results benchmark "$label" "$run_dir" "$results_dir" "$serving_at_start"
 echo
 echo "Latest successful run: $results_dir/benchmark-$label.latest"
 echo "Saved $json_file"

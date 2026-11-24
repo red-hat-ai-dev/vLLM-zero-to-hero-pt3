@@ -75,9 +75,10 @@ ghcr.io/red-hat-ai-dev/vllm-zero-to-hero:rocm
 ```
 
 The images do not contain model weights. The launcher passes the model and its
-options to the image, which replaces the Part 1 defaults. Models are stored in
-the same `vllm-models` volume as Part 1, so a model that is already downloaded
-is reused. Set `IMAGE_REPO` to use images built elsewhere, and `HF_TOKEN` to
+options to the image, which replaces the Part 1 defaults. Part 3 keeps its
+models in the labeled `vllm-zero-to-hero-pt3-models` volume. The first run
+downloads the models even if an earlier release used the shared `vllm-models`
+volume. Set `IMAGE_REPO` to use images built elsewhere, and `HF_TOKEN` to
 pass a Hugging Face token into the container.
 
 Accelerator detection, `ENGINE`, NVIDIA Container Toolkit checks, and
@@ -86,7 +87,7 @@ automatic cleanup of failed starts all work as described in
 
 [`scripts/engine.sh`](../scripts/engine.sh) is the helper used by `stop.sh` and
 `cleanup.sh` to locate the engine that owns the managed container or volume.
-It verifies the container's project label and asks for an explicit `ENGINE`
+It verifies resource ownership labels and asks for an explicit `ENGINE`
 if separate project resources exist in both Podman and Docker.
 
 ### CPU
@@ -104,12 +105,10 @@ The Mac path uses the vLLM Metal environment from Part 1 at
 built for GPU kernels that vLLM Metal does not provide, so the Mac comparison
 uses a full-precision MLX checkpoint and a four-bit MLX checkpoint instead.
 
-The process ID and log are stored in the same place as Part 1:
-
-```text
-$TMPDIR/vllm-zero-to-hero/metal.pid
-$TMPDIR/vllm-zero-to-hero/metal.log
-```
+Part 3 records the server's process identity and log in
+`${TMPDIR:-/tmp}/vllm-zero-to-hero-pt3/`. Stop checks the recorded identity
+before signaling a process. If you upgrade while an older server is running,
+stop it from the checkout that launched it.
 
 ### One server at a time
 
@@ -156,9 +155,14 @@ results/
 ```
 
 Each run has its own directory. After a successful run, `scripts/results.py`
-checks the expected report, records the tool versions and workload settings,
-and updates the corresponding `.latest` link. Failed reruns leave the previous
-successful link in place and keep their output for diagnosis.
+checks the expected report and writes a `run.json` manifest with a unique run
+ID, tool versions, and workload settings. The client reads `/v1/models` at the
+start and end of the workload. It records the checkpoint root and context
+length when available. For a server it can match to the lesson launcher, it
+also records the mode, backend, and server instance. For a local Linux
+checkpoint it records the source of the bind mount. The `.latest` link moves
+only after these checks pass. If the observed server changes or the workload
+fails, the previous successful result stays available.
 
 ## What `benchmark.sh` does
 
@@ -248,20 +252,25 @@ It also validates the GuideLLM report structure and the reported workload.
 The serving endpoint recorded in each task's `metadata.base_url` is excluded
 from the comparison, allowing matching runs served on different ports. All
 other task configuration and metadata checks still apply, including tokenizer,
-generation settings, samples, and seeds. The saved result files are unchanged.
+generation settings, samples, and seeds. Each label's benchmark and evaluation
+must agree on the serving settings they both recorded. Independent runs of one
+checkpoint can still be compared, including runs with different context
+lengths. Older manifests with matching workloads and tools can be compared
+with a notice that the checkpoint identity is unavailable.
 
 ## Complete local cleanup
 
 `./cleanup.sh` lists what it will remove and asks for confirmation. It stops the
 server, then removes:
 
-- On Linux, the `vllm-zero-to-hero` container and the `vllm-models` volume. This
-  volume is shared with Part 1.
-- On Apple Silicon, the two MLX models from the Hugging Face cache. The vLLM
-  Metal environment is kept for reuse across the lessons.
-- The `.venv` tools environment and temporary state.
+- On Linux, the owned `vllm-zero-to-hero-pt3` container and its labeled
+  `vllm-zero-to-hero-pt3-models` cache volume.
+- The local tools environment created by this version of the lesson and its temporary state.
+  Pre-existing environments and directories supplied through `TOOLS_VENV` are kept.
 
-The `results/` folder is never removed.
+Cleanup preserves `results/` and the older Part 1/3 shared volume. On Apple
+Silicon, both MLX checkpoints and the shared Metal environment remain available
+to other lessons.
 
 ## Tested support
 

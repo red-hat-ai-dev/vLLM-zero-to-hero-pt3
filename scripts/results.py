@@ -32,7 +32,9 @@ def validate_benchmark_report(data):
     return benchmarks
 
 
-def publish_run(kind, label, directory, results):
+def publish_run(
+    kind, label, directory, results, serving_at_start=None, serving_at_finish=None
+):
     directory, results = Path(directory).resolve(), Path(results).resolve()
     if directory.parent != results / "runs":
         raise ValueError("Run directory must be inside results/runs")
@@ -46,6 +48,7 @@ def publish_run(kind, label, directory, results):
     else:
         raise ValueError("Unknown result kind")
     metadata = {
+        "run_id": uuid.uuid4().hex,
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
         "kind": kind,
         "label": label,
@@ -68,6 +71,14 @@ def publish_run(kind, label, directory, results):
             )
         },
     }
+    if serving_at_start is not None:
+        initial = json.loads(serving_at_start)
+        final = json.loads(serving_at_finish)
+        if initial != final:
+            raise ValueError(
+                "Serving identity changed or could not be verified during this run; rerun it"
+            )
+        metadata["serving"] = initial
     (directory / "run.json").write_text(json.dumps(metadata, indent=2) + "\n")
     link = results / f".{kind}-{label}.{uuid.uuid4().hex}"
     link.symlink_to(Path("runs") / directory.name, target_is_directory=True)

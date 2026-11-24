@@ -1,7 +1,6 @@
 """Print the GuideLLM and lm-eval results of two runs side by side."""
 
 from copy import deepcopy
-import glob
 import json
 import math
 from pathlib import Path
@@ -14,9 +13,11 @@ from results import validate_benchmark_report
 SUSTAINED_FRACTION = 0.9
 
 
-def load_benchmarks(results_dir, label):
+def load_benchmarks(results_dir, label, run_dir=None):
     path = os.path.join(results_dir, f"benchmark-{label}.json")
-    latest = Path(results_dir) / f"benchmark-{label}.latest" / "benchmark.json"
+    latest = (
+        run_dir or Path(results_dir) / f"benchmark-{label}.latest"
+    ) / "benchmark.json"
     if latest.exists():
         path = latest
     if not os.path.exists(path):
@@ -85,8 +86,8 @@ def summarize(benchmarks):
     return summary
 
 
-def load_eval(results_dir, label):
-    latest = Path(results_dir) / f"eval-{label}.latest"
+def load_eval(results_dir, label, run_dir=None):
+    latest = run_dir or Path(results_dir) / f"eval-{label}.latest"
     root = latest if latest.exists() else Path(results_dir) / f"eval-{label}"
     files = list(root.glob("**/results_*.json"))
     if not files:
@@ -171,16 +172,37 @@ def validate_compatible_runs(first, second):
         raise ValueError("Evaluation tasks differ")
 
 
-def validate_benchmark_workloads(results_dir, first, second, kind="benchmark"):
+def validate_benchmark_workloads(
+    results_dir, first, second, kind="benchmark", directories=None
+):
     """Check wrapper provenance, including tokenizer, workload, and client versions."""
     runs = []
-    for label in (first, second):
-        path = Path(results_dir) / f"{kind}-{label}.latest" / "run.json"
+    if directories is None:
+        directories = [
+            (Path(results_dir) / f"{kind}-{label}.latest").resolve()
+            for label in (first, second)
+        ]
+    for directory in directories:
+        path = directory / "run.json"
         if not path.exists():
             raise ValueError(
                 f"{kind} provenance is missing; rerun both runs with this version"
             )
         runs.append(json.loads(path.read_text()))
+    if directories[0] == directories[1] or (
+        runs[0].get("run_id") and runs[0]["run_id"] == runs[1].get("run_id")
+    ):
+        raise ValueError(
+            f"Both labels point to the same saved {kind} run; collect two independent runs"
+        )
+    if (
+        not runs[0].get("run_id")
+        and runs[0].get("created_at_utc")
+        and runs[0] == runs[1]
+    ):
+        raise ValueError(
+            f"Both labels carry the same dated {kind} manifest; check for a copied run"
+        )
     if (
         runs[0]["workload"] != runs[1]["workload"]
         or runs[0]["tools"] != runs[1]["tools"]
@@ -188,6 +210,59 @@ def validate_benchmark_workloads(results_dir, first, second, kind="benchmark"):
         raise ValueError(
             f"{kind} workloads or tool versions differ; rerun with matching settings"
         )
+    return [run.get("serving") or {} for run in runs]
+
+
+def report_serving(labels, records):
+    """Check what each column represents before printing either metric table."""
+    settings = ("checkpoint", "backend", "image_id", "max_model_len")
+    messages = []
+    for index, label in enumerate(labels):
+        observations = [
+            pair[index] for pair in records.values() if pair[index] is not None
+        ]
+        for key in (*settings, "mode"):
+            values = {item[key] for item in observations if item.get(key) is not None}
+            if len(values) > 1:
+                raise ValueError(
+                    f"Benchmark and evaluation for {label} used different {key} values; rerun the mismatched measurement"
+                )
+        for item in observations:
+            mode = item.get("mode")
+            if label in ("baseline", "optimized") and mode and mode != label:
+                messages.append(
+                    f"Warning: {label} was collected with the launcher in {mode} mode."
+                )
+        known = [item for item in observations if item.get("checkpoint")]
+        if known:
+            checkpoint = known[0]["checkpoint"]
+            mode = next((item["mode"] for item in known if item.get("mode")), "unknown")
+            messages.append(f"{label} served {checkpoint} (launcher mode: {mode}).")
+    for first, second in records.values():
+        if first is None or second is None:
+            continue
+        if not first.get("checkpoint") or not second.get("checkpoint"):
+            messages.append(
+                "Checkpoint identity is unavailable for one or more runs; verify which models were served."
+            )
+        elif first["checkpoint"] == second["checkpoint"]:
+            changed = [
+                key
+                for key in settings
+                if first.get(key) is not None
+                and second.get(key) is not None
+                and first[key] != second[key]
+            ]
+            if changed:
+                messages.append(
+                    f"Both runs served {first['checkpoint']} with different settings ({', '.join(changed)})."
+                )
+            else:
+                messages.append(
+                    f"Warning: both runs served {first['checkpoint']}. Confirm that the same checkpoint was intended before interpreting changes."
+                )
+    for message in dict.fromkeys(messages):
+        print(message, file=sys.stderr)
 
 
 def fmt(value):
@@ -202,6 +277,10 @@ def change(before, after):
     if before is None or after is None or before == 0:
         return "--"
     return f"{(after - before) / before * 100:+.1f}%"
+
+
+def points(before, after):
+    return "--" if before is None or after is None else f"{after - before:+.1f} pts"
 
 
 def print_table(title, rows, first, second, delta):
@@ -219,11 +298,47 @@ def main():
     results_dir, first, second = sys.argv[1], sys.argv[2], sys.argv[3]
     found = False
 
-    first_bench = load_benchmarks(results_dir, first)
-    second_bench = load_benchmarks(results_dir, second)
+    labels = first, second
+    # A concurrently completed run may move .latest. Keep each column bound
+    # to one archived directory while reading reports and their manifests.
+    directories = {
+        kind: [
+            (Path(results_dir) / f"{kind}-{label}.latest").resolve() for label in labels
+        ]
+        for kind in ("benchmark", "eval")
+    }
+    first_bench, second_bench = (
+        load_benchmarks(results_dir, label, directory)
+        for label, directory in zip(labels, directories["benchmark"])
+    )
+    first_eval, second_eval = (
+        load_eval(results_dir, label, directory)
+        for label, directory in zip(labels, directories["eval"])
+    )
+    records = {}
+    if first_eval and second_eval:
+        validate_compatible_runs(first_eval, second_eval)
+    for kind, reports in (
+        ("benchmark", (first_bench, second_bench)),
+        ("eval", (first_eval, second_eval)),
+    ):
+        if all(reports):
+            records[kind] = validate_benchmark_workloads(
+                results_dir, first, second, kind, directories[kind]
+            )
+        elif any(reports):
+            # A single available result can still contradict the other kind
+            # for this label, even when its counterpart is missing.
+            records[kind] = []
+            for report, directory in zip(reports, directories[kind]):
+                manifest = directory / "run.json"
+                serving = None
+                if report and manifest.is_file():
+                    serving = json.loads(manifest.read_text()).get("serving")
+                records[kind].append(serving)
+    report_serving(labels, records)
     if first_bench and second_bench:
         found = True
-        validate_benchmark_workloads(results_dir, first, second)
         a, b = summarize(first_bench), summarize(second_bench)
         rows = [
             (name, a.get(name), b.get(name))
@@ -247,12 +362,8 @@ def main():
         print(f"No GuideLLM results for {missing}. Run ./benchmark.sh {missing} first.")
         print()
 
-    first_eval = load_eval(results_dir, first)
-    second_eval = load_eval(results_dir, second)
     if first_eval and second_eval:
         found = True
-        validate_compatible_runs(first_eval, second_eval)
-        validate_benchmark_workloads(results_dir, first, second, "eval")
         first_eval, second_eval = (
             evaluation_scores(first_eval),
             evaluation_scores(second_eval),
@@ -263,9 +374,6 @@ def main():
             (name, first_eval.get(name), second_eval.get(name))
             for name in dict.fromkeys(list(first_eval) + list(second_eval))
         ]
-        points = lambda before, after: (
-            "--" if before is None or after is None else f"{after - before:+.1f} pts"
-        )
         print_table("Accuracy (lm-eval, % correct)", rows, first, second, points)
     else:
         missing = first if not first_eval else second
