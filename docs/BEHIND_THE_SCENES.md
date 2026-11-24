@@ -194,9 +194,10 @@ The default concurrency cap is 512. The walkthrough recommends
 `MAX_CONCURRENCY=8` on Apple Silicon and a smaller workload on CPU. Keep the
 same settings for both sides of a comparison.
 
-The HTML report is built from a page template that GuideLLM downloads when the
-benchmark finishes, so the report needs internet access. The JSON file does
-not.
+GuideLLM downloads the HTML template when the benchmark finishes. Opening
+the report also needs internet access because the browser loads the chart
+code. The saved JSON contains the measurements, and `guidellm export` can
+convert it to CSV offline.
 
 ## What `evaluate.sh` does
 

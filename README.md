@@ -157,8 +157,17 @@ guidellm run \
 The sweep runs up to 10 benchmarks at 30 seconds each, plus setup and shutdown time. When it finishes, the results are saved in the `results/` folder:
 
 - `benchmark-baseline.latest/benchmark.json`: every statistic, for reloading and comparing
-- `benchmark-baseline.latest/benchmark.html`: a self-contained report with charts. Open it in a browser.
+- `benchmark-baseline.latest/benchmark.html`: open it in a browser with internet access to load the charts.
 - `benchmark-baseline.latest/benchmark.log`: the tables printed to the terminal
+
+If you're offline or the chart shows “Application error,” you can open the same measurements in a spreadsheet. The viewer can fail when two benchmarks have the same measured request rate. Run this export from the Part 3 directory before cleanup removes the tools.
+
+```bash
+.venv/bin/guidellm export results/benchmark-baseline.latest/benchmark.json \
+  --output kind=csv,path=results/baseline.csv
+```
+
+Open `results/baseline.csv` in your spreadsheet. After the three header rows, there is one row per benchmark, including ones with the same rate. The export works offline with the server stopped.
 
 ### What we are seeing
 
@@ -377,6 +386,13 @@ The script reads both sets of results and prints them side by side with the chan
 Use the performance rows to decide how much faster the optimized model is, and the accuracy rows to decide how much quality it gave up. Whether the tradeoff is worth it depends on the workload.
 
 You can also open `results/benchmark-baseline.latest/benchmark.html` and `results/benchmark-optimized.latest/benchmark.html` in a browser to compare the charts.
+
+For a spreadsheet comparison, export the baseline CSV as shown in step 3 and run the matching command for the optimized model.
+
+```bash
+.venv/bin/guidellm export results/benchmark-optimized.latest/benchmark.json \
+  --output kind=csv,path=results/optimized.csv
+```
 
 ## Stop and clean up
 
